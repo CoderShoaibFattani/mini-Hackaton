@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { Routes, Route } from "react-router-dom";
-import { setUser, setRole } from "./store/slices/userSlice";
-import { auth } from "./config/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { setUser, setRole, setAuthenticated } from "./store/slices/userSlice";
+// import { auth } from "./config/firebase";
+// import { onAuthStateChanged } from "firebase/auth";
+// import { doc, getDoc } from "firebase/firestore";
+// import { db } from "./config/firebase";
 
 import SignUp from "./screens/SignUp";
 import LogIn from "./screens/LogIn";
@@ -14,27 +16,22 @@ import CustomerPanel from "./components/panels/CustomerPanel";
 import CustomerList from "./screens/subscreens/CustomerList";
 import HomeRoute from "./Routes/HomeRoute";
 import User from "./Routes/User";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "./config/firebase";
 import CustomerRegistration from "./screens/subscreens/CustomerRegistration";
 
 const App = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (userCredential) => {
-      if (userCredential) {
-        const userData = await getDoc(doc(db, "users", userCredential.uid));
-        const user = userData.data();
-        dispatch(setUser(user));
-        dispatch(setRole(user.registrationFor));
-      } else {
-        dispatch(setUser(null));
-        dispatch(setRole(null));
-      }
-    });
+    // Check if user and role exist in localStorage
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    const storedRole = localStorage.getItem("role");
 
-    return () => unsubscribe(); // Clean up the subscription on unmount
+    if (storedUser && storedRole) {
+      // Set user and role in Redux
+      dispatch(setUser(storedUser));
+      dispatch(setRole(storedRole));
+      dispatch(setAuthenticated(true)); // Mark the user as authenticated
+    }
   }, [dispatch]);
 
   return (
@@ -47,6 +44,7 @@ const App = () => {
         <Route path="/admin" element={<AdminPanel />}>
           <Route path="Customer-List" element={<CustomerList />} />
           <Route path="Customer-Entry/:id" element={<CustomerRegistration />} />
+          <Route path="Customer-Entry" element={<CustomerRegistration />} />
         </Route>
         <Route path="/manager" element={<ManagerPanel />} />
         <Route path="/staff" element={<StaffPanel />} />

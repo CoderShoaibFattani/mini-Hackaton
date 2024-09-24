@@ -28,7 +28,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { clearUser } from "../store/slices/userSlice";
+import { logOut } from "../store/slices/userSlice";
 
 const settings = ["Logout"];
 
@@ -161,7 +161,9 @@ function ResponsiveAppBar() {
   const handleLogout = () => {
     signOut(auth)
       .then(() => {
-        dispatch(clearUser());
+        dispatch(logOut());
+        localStorage.removeItem("user");
+        localStorage.removeItem("role");
         navigate("/login");
       })
       .catch((error) => {

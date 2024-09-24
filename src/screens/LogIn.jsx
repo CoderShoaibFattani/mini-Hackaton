@@ -1,5 +1,5 @@
 import { useDispatch } from "react-redux";
-import { setUser, setRole } from "../store/slices/userSlice";
+import { setUser, setRole, setAuthenticated } from "../store/slices/userSlice";
 
 import {
   Box,
@@ -34,8 +34,16 @@ const LogIn = () => {
           doc(db, "users", userCredential.user.uid)
         );
         const user = userData.data();
+
+        // Store user and role in Redux
         dispatch(setUser(user));
         dispatch(setRole(user.registrationFor));
+        dispatch(setAuthenticated(true));
+
+        // Persist user and role in localStorage
+        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("role", user.registrationFor);
+
         navigate(`/${user.registrationFor.toLowerCase()}`);
       })
       .catch((error) => {

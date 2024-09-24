@@ -1,7 +1,15 @@
 import Paper from "@mui/material/Paper";
 import { db } from "../../config/firebase";
 import { useEffect, useState } from "react";
-import { addDoc, collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from "firebase/firestore";
 import { Box, Button, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import Table from "@mui/material/Table";
@@ -16,43 +24,79 @@ import { useSelector } from "react-redux";
 
 function DataTable() {
   const [rows, setRows] = useState([]);
-  const [customerData, setCustomerData] = useState({});
+  const role = useSelector((state) => state.user.role);
 
-  const cData = async () => {
-    customerData.map(async (e, i) => {
-      await addDoc(collection(db, "customers"), e);
-    });
+  const getData = async () => {
+    try {
+      // Fetching users with the "Customer" role from the "users" collection
+      const usersQuery = query(
+        collection(db, "users"),
+        where("registrationFor", "==", "Customer")
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      const userData = usersSnapshot.docs.map((doc) => ({
+        id: doc.id, // Using Firestore document ID as unique identifier
+        ...doc.data(),
+      }));
+
+      // Add customer data to the "customers" collection if not already added
+      const customersSnapshot = await getDocs(collection(db, "customers"));
+      const existingCustomers = customersSnapshot.docs.map((doc) => doc.data());
+
+      for (const customer of userData) {
+        const customerExists = existingCustomers.some(
+          (c) => c.id === customer.id // Check for unique ID instead of email
+        );
+        if (!customerExists) {
+          // Use setDoc with a specific doc ID to avoid duplicates (using customer's unique id)
+          const customerRef = doc(collection(db, "customers"), customer.id);
+          await setDoc(customerRef, customer);
+        }
+      }
+
+      // Fetch updated customer data from "customers" collection
+      const updatedCustomerSnapshot = await getDocs(
+        collection(db, "customers")
+      );
+      const customerList = updatedCustomerSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // Setting the data in rows state to display in the table
+      setRows(customerList);
+    } catch (error) {
+      console.error("Error fetching or adding customer data:", error);
+    }
   };
-
-  useEffect(() => {
-    cData();
-  }, [customerData]);
 
   useEffect(() => {
     getData();
   }, []);
 
-  const getData = async () => {
-    const usersData = await getDocs(collection(db, "users"));
-    const userData = usersData.docs.map((doc) => ({
-      ...doc.data(),
-    }));
-
-    const custData = userData.filter((e) => e.registerFor === "Customer");
-    setCustomerData(custData);
-
-    const snapshot = await getDocs(collection(db, "customers"));
-    const data = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setRows(data);
-    console.log(rows);
-  };
-  const role = useSelector((state) => state.user.role);
   const navigate = useNavigate();
-  const handleEdit = (id) => {
+
+  const handleEdit = (id, obj) => {
+    // Redirect user to the Customer Registration page for editing
+    const jsonObj = JSON.stringify(obj);
+    localStorage.setItem("customerData", jsonObj);
     navigate(`/${role.toLowerCase()}/Customer-Entry/${id}`);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      // Delete the customer from the "customers" collection
+      const customerRef = doc(db, "customers", id);
+      await deleteDoc(customerRef);
+
+      const userRef = doc(db, "users", id);
+      await deleteDoc(userRef);
+
+      // Optionally, refetch the customer data to refresh the table after deletion
+      getData();
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+    }
   };
 
   return (
@@ -77,12 +121,12 @@ function DataTable() {
               <TableCell component="th" scope="row">
                 {row.id}
               </TableCell>
-              <TableCell align="right">{row.firstName}</TableCell>
-              <TableCell align="right">{row.lastName}</TableCell>
-              <TableCell align="right">{row.email}</TableCell>
-              <TableCell align="right">{row.phoneNumber}</TableCell>
-              <TableCell align="right">
-                <EditIcon onClick={() => handleEdit(row.id)} />
+              <TableCell align="center">{row.firstName}</TableCell>
+              <TableCell align="center">{row.lastName}</TableCell>
+              <TableCell align="center">{row.email}</TableCell>
+              <TableCell align="center">{row.phoneNumber}</TableCell>
+              <TableCell align="center">
+                <EditIcon onClick={() => handleEdit(row.id, row)} />
                 <DeleteIcon onClick={() => handleDelete(row.id)} />
               </TableCell>
             </TableRow>
@@ -95,6 +139,8 @@ function DataTable() {
 
 const CustomerList = () => {
   const navigate = useNavigate();
+  const role = useSelector((state) => state.user.role);
+
   return (
     <Box margin="20px auto" sx={{ position: "relative" }}>
       <Typography
@@ -119,12 +165,11 @@ const CustomerList = () => {
         <Button
           variant="contained"
           color="secondary"
-          onClick={() => navigate("/dashboard/Student-Registration")}
+          onClick={() => navigate(`/${role.toLowerCase()}/Customer-Entry`)}
         >
           Add
         </Button>
       </Box>
-
       <Box>
         <DataTable />
       </Box>

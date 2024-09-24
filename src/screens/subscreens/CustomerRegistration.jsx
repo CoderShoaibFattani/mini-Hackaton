@@ -1,67 +1,69 @@
-import {
-  Box,
-  Button,
-  // FormControlLabel,
-  InputLabel,
-  // Radio,
-  // RadioGroup,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Button, InputLabel, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import { collection, addDoc, getDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 const CustomerRegistration = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [data, setData] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   const { id } = useParams();
+  const navigate = useNavigate();
+  const role = useSelector((state) => state.user.role);
 
-  const getData = async () => {
-    const data = await getDoc(doc(db, "customers", id));
-    setData(data);
+  const getData = () => {
+    if (id) {
+      const dataFromLS = localStorage.getItem("customerData");
+      const customerData = JSON.parse(dataFromLS);
+      if (customerData) {
+        setFirstName(customerData.firstName);
+        setLastName(customerData.lastName);
+        setEmail(customerData.email);
+        setPhoneNumber(customerData.phoneNumber);
+        setIsEditing(true);
+      }
+    }
   };
 
   useEffect(() => {
     getData();
-  }, []);
-
-  const navigate = useNavigate();
+  }, [id]); // Run this effect when `id` changes
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setFirstName(data.firstName);
-    setLastName(data.lastName);
-    setEmail(data.email);
-    setPhone(data.phoneNumber);
+
     try {
-      if (data) {
-        await updateDoc(doc(db, "customers", id));
+      if (isEditing) {
+        // Update existing customer
+        await updateDoc(doc(db, "customers", id), {
+          firstName,
+          lastName,
+          email,
+          phoneNumber,
+        });
+        alert("Customer details updated successfully!");
+      } else {
+        // Add new customer
+        await addDoc(collection(db, "customers"), {
+          firstName,
+          lastName,
+          email,
+          phoneNumber,
+        });
+        alert("New customer added successfully!");
       }
-      const docRef = await addDoc(collection(db, "customers"), {
-        firstName,
-        lastName,
-        email,
-        phone,
-      });
-      console.log("Document written with ID: ", docRef.id);
-      const customerId = docRef.id;
-      localStorage.setItem("customerId", customerId);
-      navigate("/dashboard/roombooking");
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPhone("");
-      setAddress("");
+
+      navigate(`/${role.toLowerCase()}/Customer-List`); // Redirect after submission
     } catch (e) {
-      console.error("Error adding document: ", e);
+      console.error("Error adding/updating document: ", e);
     }
   };
+
   return (
     <Box width="50%" margin="20px auto">
       <Typography
@@ -74,7 +76,7 @@ const CustomerRegistration = () => {
           mb: "30px",
         }}
       >
-        Customer Registration Form
+        {isEditing ? "Edit Customer" : "Customer Registration Form"}
       </Typography>
       <form onSubmit={handleSubmit}>
         <Box mb="25px">
@@ -83,8 +85,8 @@ const CustomerRegistration = () => {
             fullWidth
             required
             type="text"
-            value={data.firstName}
-            // onChange={(e) => setFirstName(e.target.value)}
+            value={firstName} // Bind to firstName state
+            onChange={(e) => setFirstName(e.target.value)} // Update state on change
           />
         </Box>
         <Box mb="25px">
@@ -93,8 +95,8 @@ const CustomerRegistration = () => {
             fullWidth
             required
             type="text"
-            value={data.lastName}
-            // onChange={(e) => setLastName(e.target.value)}
+            value={lastName} // Bind to lastName state
+            onChange={(e) => setLastName(e.target.value)} // Update state on change
           />
         </Box>
         <Box mb="25px">
@@ -103,8 +105,8 @@ const CustomerRegistration = () => {
             fullWidth
             required
             type="email"
-            value={data.email}
-            // onChange={(e) => setEmail(e.target.value)}
+            value={email} // Bind to email state
+            onChange={(e) => setEmail(e.target.value)} // Update state on change
           />
         </Box>
         <Box mb="25px">
@@ -113,18 +115,8 @@ const CustomerRegistration = () => {
             fullWidth
             required
             type="text"
-            value={data.phoneNumber}
-            // onChange={(e) => setPhone(e.target.value)}
-          />
-        </Box>
-        <Box mb="25px">
-          <InputLabel sx={{ mb: "10px" }}>Address</InputLabel>
-          <TextField
-            fullWidth
-            required
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            value={phoneNumber} // Bind to phoneNumber state
+            onChange={(e) => setPhoneNumber(e.target.value)} // Update state on change
           />
         </Box>
 
@@ -135,7 +127,7 @@ const CustomerRegistration = () => {
             sx={{ fontSize: "20px", left: "40%" }}
             type="submit"
           >
-            Book Room
+            {isEditing ? "Update Customer" : "Add Customer"}
           </Button>
         </Box>
       </form>
